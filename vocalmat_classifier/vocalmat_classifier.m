@@ -15,23 +15,18 @@ plot_stats_per_bin = 1;
 
 disp('[vocalmat][classifier]: list of parameters to be used in this analysis (1 = On; 0 = Off):')
 disp('|==========================================|');
-disp(['| Bin size (in seconds)              :  ' num2str(bin_size) ' |']);
-disp(['| Save Excel file                    :  ' num2str(save_excel_file) '  |']);
-disp(['| Save spectrogram segmentation plot :  ' num2str(save_plot_spectrograms) '  |']);
-disp(['| |- Plot axe dots (segmentation)    :  ' num2str(axes_dots) '  |']);
-disp(['| |- Scatter plot step size          :  ' num2str(scatter_step) '  |']);
+disp(['| Bin size (in seconds)              :  ' num2str(user_settings.bin_size) ' |']);
+disp(['| Save Excel file                    :  ' num2str(user_settings.save_excel_file) '  |']);
+disp(['| Save spectrogram segmentation plot :  ' num2str(user_settings.save_plot_spectrograms) '  |']);
+disp(['| |- Plot axe dots (segmentation)    :  ' num2str(user_settings.axes_dots) '  |']);
+disp(['| |- Scatter plot step size          :  ' num2str(user_settings.scatter_step) '  |']);
 disp('|==========================================|');
 
 raiz = pwd;
 model_class_DL = load('Mdl_categorical_DL.mat');
 model_class_DL = model_class_DL.netTransfer;
 
-% [vfilename,vpathname] = uigetfile({'*.mat'},'Select the output file')
-% disp(['Reading ' vfilename])
-vfile = fullfile(vpathname,vfilename); 
-% load(vfile);
-%cd(vpathname);
-%list = dir('*output*.mat');
+vfile = fullfile(appinfo.vpathname,vfilename);
 %diary(['Summary_classifier' num2str(horzcat(fix(clock))) '.txt'])
 
 %Setting up
@@ -69,7 +64,7 @@ freq_vocal = freq_vocal(~cellfun('isempty',freq_vocal));
 intens_vocal = intens_vocal(~cellfun('isempty',intens_vocal));
 
 output=[];
-cd(vpathname)
+cd(appinfo.vpathname)
 if ~exist(vfilename, 'dir')
     mkdir(vfilename)
 end
@@ -201,17 +196,17 @@ end
 cd(raiz)
 
 if use_DL==1
-    if save_plot_spectrograms==1
+    if user_settings.save_plot_spectrograms==1
         fig = figure('Name',vfilename,'NumberTitle','off','Position',[300 200 1167 875]);
     end
 
-    cd(vpathname)
+    cd(appinfo.vpathname)
     if ~exist(vfilename, 'dir')
         mkdir(vfilename)
     end
     cd(vfilename)
     
-    if (~exist([vfile '\All_axes'],'dir') && save_plot_spectrograms==1)
+    if (~exist([vfile '\All_axes'],'dir') && user_settings.save_plot_spectrograms==1)
         mkdir('All_axes')
     end
     
@@ -227,8 +222,8 @@ if use_DL==1
         [T_min T_min] = min(abs(T_orig - T_min_max(1)));
         [T_max T_max] = min(abs(T_orig - T_min_max(2)));
         
-        if save_plot_spectrograms==1
-           if save_plot_spectrograms==1
+        if user_settings.save_plot_spectrograms==1
+           if user_settings.save_plot_spectrograms==1
             clf('reset');
             hold on;
             surf(T_orig(T_min:T_max),F_orig,A_total(:,T_min:T_max),'edgecolor','none');
@@ -236,8 +231,8 @@ if use_DL==1
             colormap(gray);
             xlabel('Time (s)'); ylabel('Freq (Hz)');
             
-            if axes_dots == 1
-                for time_stamp = 1:scatter_step:size(time_vocal{id_vocal},2)
+            if user_settings.axes_dots == 1
+                for time_stamp = 1:user_settings.scatter_step:size(time_vocal{id_vocal},2)
                     try
                         scatter(time_vocal{id_vocal}(time_stamp)*ones(size(freq_vocal{id_vocal}{time_stamp}')),freq_vocal{id_vocal}{time_stamp}',[],'b');
                     catch
@@ -247,14 +242,14 @@ if use_DL==1
             end
             set(gca,'fontsize', 18);
             frame = getframe(fig);
-            imwrite(frame.cdata, fullfile(vpathname , vfilename, 'All_axes', [num2str(id_vocal)  '.png']), 'png');
+            imwrite(frame.cdata, fullfile(appinfo.vpathname , vfilename, 'All_axes', [num2str(id_vocal)  '.png']), 'png');
             hold off;
             
             end
         end        
         img = imresize(flipud(mat2gray(A_total(:,T_min:T_max))),size_spectrogram);
         img = cat(3, img, img, img);
-        imwrite(img,fullfile(vpathname, vfilename, 'All', [num2str(id_vocal)  '.png']))
+        imwrite(img,fullfile(appinfo.vpathname, vfilename, 'All', [num2str(id_vocal)  '.png']))
         
     end
     
@@ -306,7 +301,7 @@ for k=1:size(freq_vocal,2)
 end
 
 if use_DL==1
-    validationImages = imageDatastore(fullfile(vpathname, vfilename, 'All'));
+    validationImages = imageDatastore(fullfile(appinfo.vpathname, vfilename, 'All'));
     [predictedLabels, scores] = classify(model_class_DL,validationImages);
     lista = [validationImages.Files, predictedLabels];
     
@@ -353,14 +348,34 @@ noise_dist_count = sum(strcmp(T_classProb.DL_out,'noise_dist'));
 harmonic_count = unique(harmonic_count);
 noisy_vocal_count = unique(noisy_vocal_count);
 
-disp(['[vocalmat][classifier]: total number of vocalizations: ' num2str(size(time_vocal,2)-noise_dist_count) ' vocalizations (' num2str(noise_dist_count) ' were noise)']);
+summary = ['[vocalmat][classifier]: total number of vocalizations: ' num2str(size(time_vocal,2)-noise_dist_count) ' vocalizations (' num2str(noise_dist_count) ' were noise)'];
+disp(summary)
+
+if user_settings.save_summary_excel==1
+	if appinfo.summary_excel == ""
+		unique = datestr(now,'mm-dd-yyyy_HH-MM');
+		appinfo.summary_excel = fullfile(appinfo.vpathname, ['summary_' unique '.xlsx']);
+		title = ["file" "vocalizations" "noise"];
+		xlswrite(appinfo.summary_excel, [title model_class_DL.Layers(25,1).ClassNames'], 'Summary')
+	end
+
+	res = [];
+	for j=1:size(model_class_DL.Layers(25,1).ClassNames)
+		res = [res; eval([cell2mat(model_class_DL.Layers(25,1).ClassNames(j)) '_count'])];
+	end
+    rowi = filei + 1;
+	xlswrite(appinfo.summary_excel,{vfilename},'Summary', ['A' int2str(rowi)])
+	xlswrite(appinfo.summary_excel,[size(time_vocal,2)-noise_dist_count noise_dist_count res'],'Summary', ['B' int2str(rowi)])
+end
+
+
 
 for j=1:size(model_class_DL.Layers(25,1).ClassNames)
     eval(['disp([''' cell2mat(model_class_DL.Layers(25,1).ClassNames(j)) ': '' num2str('  cell2mat(model_class_DL.Layers(25,1).ClassNames(j)) '_count)])'])
 end
 
 % Fixed up to here.
-if save_excel_file==1
+if user_settings.save_excel_file==1
     %     names2 = model_class_DL_RF.ClassNames;
     names = [{'Names_vocal'};{'Start_time'}; {'End_time'}; {'Inter_vocal_interval'}; {'Inter_real_vocal_interval'}; {'Duration'}; {'min_freq_main'}; {'max_freq_main'};{'mean_freq_main'};{'Bandwidth'};{'min_freq_total'};...
         {'max_freq_total'};{'mean_freq_total'};{'min_intens_total'};{'max_intens_total'}; {'corrected_max_intens_total'};{'Background_intens'};{'mean_intens_total'};{'Class'};{'Harmonic'};{'Noisy'}];
@@ -455,8 +470,8 @@ end
 aux = ~strcmp(T.Class,'noise_dist');
 T_no_noise = T(aux,:);
 if size(T_no_noise,1)>0
-    num_of_bins = ceil(max(cell2mat(T_no_noise.Start_time))/bin_size);
-    edges = 0:bin_size:num_of_bins*bin_size;
+    num_of_bins = ceil(max(cell2mat(T_no_noise.Start_time))/user_settings.bin_size);
+    edges = 0:user_settings.bin_size:num_of_bins*user_settings.bin_size;
     [num_vocals_in_bin] = histcounts(cell2mat(T_no_noise.Start_time),edges);
     
     
