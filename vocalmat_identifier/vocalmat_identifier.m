@@ -49,9 +49,7 @@
 % -- (1) SETUP BEGIN ---------------------------------------------------------------------------
 % ----------------------------------------------------------------------------------------------
 raiz = pwd;
-disp('[vocalmat]: choose the audio file to be analyzed.');
-[vfilename,vpathname] = uigetfile({'*.wav'},'Select the sound track');
-cd(vpathname);
+cd(appinfo.vpathname);
 p = mfilename('fullpath');
 
 % -- save_spectrogram_background: option to output spectrogram background
@@ -60,7 +58,7 @@ save_spectrogram_background = 0;
 % -- local_median: option to use the local median method to detect noise
 local_median = 1;
 
-if ~save_output_files
+if ~user_settings.save_output_files
     disp('[vocalmat][identifier]: the output files from VocalMat Identifier will not be saved to disk (default behavior).')
     disp('                        to change this, modify ''save_output_files'' from 0 to 1 in vocalmat_identifier.m.');
 end
@@ -68,7 +66,7 @@ end
 % -- tic: start runtime counter
 tic
 
-vfile = fullfile(vpathname, vfilename);
+vfile = fullfile(appinfo.vpathname, vfilename);
 mkdir(vfile(1:end-4))
 clear time_vocal freq_vocal intens_vocal time_vocal_nogaps freq_vocal_nogaps intens_vocal_nogaps
 
@@ -259,7 +257,7 @@ for k = 1:cc_count
             freq_vocal{id}{freq_per_time} = find(grain(:,time_vocal{id}(freq_per_time))==1);
         end
     else
-        if min(graindata_2(k).PixelList(:,1)) - max(time_vocal{id}) > max_interval
+        if min(graindata_2(k).PixelList(:,1)) - max(time_vocal{id}) > user_settings.max_interval
         % -- if two points are distant enough, identify as a new vocalization
             id = id + 1;
             time_vocal{id}    = [];
@@ -291,9 +289,9 @@ centroid_to_id = temp;
 
 if size(time_vocal,2)>0
 % -- if there are vocalizations, remove the ones that have less than 6 points
-    disp(['[vocalmat]: removing small vocalizations (less than ' num2str(minimum_size) ' points).'])
+    disp(['[vocalmat]: removing small vocalizations (less than ' num2str(user_settings.minimum_size) ' points).'])
     for k=1:size(time_vocal,2)
-        if  size(time_vocal{k},2) < minimum_size
+        if  size(time_vocal{k},2) < user_settings.minimum_size
             time_vocal{k} = [];
             freq_vocal{k} = [];
         end
@@ -527,7 +525,7 @@ if size(time_vocal,2)>0
     end
 
     vfilename  = vfilename(1:end-4);
-    if save_output_files == 1
+    if user_settings.save_output_files == 1
         disp(['[vocalmat]: saving output files.'])
         % -- output identified vocalizations
 %         cd(fullfile(root_path, 'audios'))
