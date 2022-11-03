@@ -41,7 +41,10 @@ appinfo = struct;
 appinfo.root_path       = fileparts(mfilename('fullpath')); %Set this path to VocalMat's root folder
 appinfo.classifier_path = fullfile(appinfo.root_path, 'vocalmat_classifier');
 appinfo.analysis_path = fullfile(appinfo.root_path, 'vocalmat_analysis');
-appinfo.gui.fig = uifigure('visible', 'off');
+appinfo.gui.display_progress            = ~verLessThan('matlab', '9.4'); % introduced in R2018a
+if appinfo.gui.display_progress
+	appinfo.gui.fig = uifigure('visible', 'off');
+end
 addpath(genpath(appinfo.root_path));
 
 try
@@ -73,12 +76,16 @@ disp('[vocalmat]: choose the audio file to be analyzed.');
 [appinfo.vfilename_arr,appinfo.vpathname] = uigetfile({'*.wav'},'Select the sound track', 'MultiSelect', 'on');
 appinfo.vfilename_arr = cellstr(appinfo.vfilename_arr);
 appinfo.summary_excel = "";
-appinfo.gui.fig.Visible = 'on';
-appinfo.gui.progressbar = uiprogressdlg(appinfo.gui.fig,'Title','Please wait','Cancelable','on');
+if appinfo.gui.display_progress
+	appinfo.gui.fig.Visible = 'on';
+	appinfo.gui.progressbar = uiprogressdlg(appinfo.gui.fig,'Title','Please wait','Cancelable','on');
+end
 
 for filei=1:length(appinfo.vfilename_arr)
-	appinfo.gui.progressbar.Value = filei/length(appinfo.vfilename_arr);
-	appinfo.gui.progressbar.Message = strcat("Processing ", appinfo.vfilename_arr{filei});
+	if appinfo.gui.display_progress
+		appinfo.gui.progressbar.Value = filei/length(appinfo.vfilename_arr);
+		appinfo.gui.progressbar.Message = strcat("Processing ", appinfo.vfilename_arr{filei});
+	end
 	disp(fullfile(appinfo.vpathname, appinfo.vfilename_arr{filei}))
 	vfilename = appinfo.vfilename_arr{filei};
 	% -- handle execution over to the identifiehoor
@@ -104,11 +111,15 @@ for filei=1:length(appinfo.vfilename_arr)
 	% cd(appinfo.analysis_path); run('kernel_alignment.m')
     clearvars -except user_settings appinfo
 	close all
-	if appinfo.gui.progressbar.CancelRequested
-		break
-    end
+	if appinfo.gui.display_progress
+		if appinfo.gui.progressbar.CancelRequested
+			break
+		end
+	end
 end
 
-close(appinfo.gui.progressbar);
-close(appinfo.gui.fig)
+if appinfo.gui.display_progress
+	close(appinfo.gui.progressbar);
+	close(appinfo.gui.fig)
+end
 disp(['[vocalmat]: finished!'])
